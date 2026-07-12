@@ -8,18 +8,27 @@ export function seededRandom(seed) {
   }
 }
 
-// Client-Side Anti-Cheat: Validates if a proposed move exists in the legal moves array
+// Validates if a proposed move exists in the legal moves array
 export function validateMove(proposedMove, legalMoves) {
   return legalMoves.some(move => move.x === proposedMove.x && move.y === proposedMove.y);
 }
 
-// Data Science Export: Generates JSON of player metrics
-export function exportGameData(metrics) {
-  const dataStr = "data:text/json;charset=utf-8," + encodeURIComponent(JSON.stringify(metrics));
-  const downloadAnchorNode = document.createElement('a');
-  downloadAnchorNode.setAttribute("href", dataStr);
-  downloadAnchorNode.setAttribute("download", "chess_metrics.json");
-  document.body.appendChild(downloadAnchorNode);
-  downloadAnchorNode.click();
-  downloadAnchorNode.remove();
-}
+// Export: Generates time stamped TXT of player metrics and seed of that run
+export const exportGameData = (metrics, seed) => {
+  const now = new Date();
+  const timestamp = `${now.getFullYear()}-${String(now.getMonth() + 1).padStart(2, '0')}-${String(now.getDate()).padStart(2, '0')}_${String(now.getHours()).padStart(2, '0')}-${String(now.getMinutes()).padStart(2, '0')}-${String(now.getSeconds()).padStart(2, '0')}`;
+
+  const textContent = `Chess Game Metrics\n------------------\nSeed: ${seed}\nMoves: ${metrics.moves}\nCaptures: ${metrics.captures}\n`;
+  
+  const blob = new Blob([textContent], { type: 'text/plain' });
+  const url = URL.createObjectURL(blob);
+  
+  const link = document.createElement('a');
+  link.href = url;
+  link.download = `starry_pawn_${timestamp}.txt`; 
+  
+  document.body.appendChild(link);
+  link.click();
+  document.body.removeChild(link);
+  URL.revokeObjectURL(url);
+};

@@ -1,25 +1,37 @@
 import { seededRandom } from './utils';
 
-export const PIECES = { KING: '♚', QUEEN: '♛', ROOK: '♜', BISHOP: '♝', KNIGHT: '♞', PAWN: '♟', RAINBOW: '⭐' };
+export const PIECES = { KING: '♚', QUEEN: '♛', ROOK: '♜', BISHOP: '♝', KNIGHT: '♞', PAWN: '♟', UFO: '🛸' };
 
 export function generateLevel(level, seedStr) {
   const rng = seededRandom(hashCode(seedStr + level.toString()));
   let board = Array(8).fill(null).map(() => Array(8).fill(null));
   
-  // Place Rainbow Pawn (Player)
   const playerPos = { x: Math.floor(rng() * 8), y: Math.floor(rng() * 8) };
-  board[playerPos.y][playerPos.x] = { type: PIECES.RAINBOW, isPlayer: true, id: 'player' };
+  board[playerPos.y][playerPos.x] = { type: PIECES.UFO, isPlayer: true, id: 'player' };
 
-  // Place Enemies (4 to 8)
+  // Define the exact standard chess set limits
+  let availablePieces = [
+    ...Array(8).fill(PIECES.PAWN),
+    ...Array(2).fill(PIECES.ROOK),
+    ...Array(2).fill(PIECES.KNIGHT),
+    ...Array(2).fill(PIECES.BISHOP),
+    PIECES.QUEEN
+  ];
+
+  // Shuffle the piece pool
+  for (let i = availablePieces.length - 1; i > 0; i--) {
+    const j = Math.floor(rng() * (i + 1));
+    [availablePieces[i], availablePieces[j]] = [availablePieces[j], availablePieces[i]];
+  }
+
   const numEnemies = Math.floor(rng() * 5) + 4;
   let enemiesPlaced = 0;
-  const enemyTypes = [PIECES.QUEEN, PIECES.ROOK, PIECES.BISHOP, PIECES.KNIGHT, PIECES.PAWN];
 
-  // Guarantee one King
   placePieceSafely(board, { type: PIECES.KING, isPlayer: false, id: 'enemy_king' }, playerPos, rng);
 
   while (enemiesPlaced < numEnemies - 1) {
-    const type = enemyTypes[Math.floor(rng() * enemyTypes.length)];
+    // Draw from the shuffled pool
+    const type = availablePieces.pop();
     placePieceSafely(board, { type, isPlayer: false, id: `enemy_${enemiesPlaced}` }, playerPos, rng);
     enemiesPlaced++;
   }

@@ -1,28 +1,28 @@
-import React, { useState, useEffect } from 'react';
+import React, { useState } from 'react';
 import { generateLevel } from './engine';
 import { calculateBestEnemyMove, getLegalMoves } from './ai';
 import { exportGameData, validateMove } from './utils';
 import './App.css';
 
+// Generiert exakt 16 zufällige Zeichen (Zahlen und Buchstaben)
+const generateSeed = () => [...Array(16)].map(() => Math.floor(Math.random() * 36).toString(36)).join('');
+
 export default function App() {
   const [level, setLevel] = useState(1);
-  const [seed] = useState(() => Math.random().toString(36).substring(7));
+  const [seed, setSeed] = useState(generateSeed);
+  const [seedInput, setSeedInput] = useState('');
   const [gameState, setGameState] = useState(generateLevel(1, seed));
-  const [trinkets, setTrinkets] = useState([]);
-  const [activeMoveMode, setActiveMoveMode] = useState(0); // 0 = King, 1 = Trinket 1, etc.
+  const [trinkets, setTrinkets] = useState({}); 
+  const [activeMoveMode, setActiveMoveMode] = useState(null); 
   const [metrics, setMetrics] = useState({ moves: 0, captures: 0 });
   const [gameOver, setGameOver] = useState(false);
-
-  // Cycle trinkets on player click (No UI)
-  const handlePlayerClick = () => {
-    setActiveMoveMode((prev) => (prev + 1) % (trinkets.length + 1));
-  };
 
   const handleTileClick = (x, y) => {
     if (gameOver) return;
 
     const proposedMove = { x, y };
-    const legalMoves = getLegalMoves(gameState.playerPos, gameState.board); // Modify to pass activeMoveMode
+    const currentMoveMode = activeMoveMode || '♚';
+    const legalMoves = getLegalMoves(gameState.playerPos, gameState.board, currentMoveMode);
 
     if (validateMove(proposedMove, legalMoves)) {
       executePlayerMove(proposedMove);
@@ -33,27 +33,34 @@ export default function App() {
     let newBoard = [...gameState.board.map(row => [...row])];
     const targetPiece = newBoard[targetPos.y][targetPos.x];
     
-    // Win Condition
     if (targetPiece && targetPiece.id === 'enemy_king') {
       setLevel(l => l + 1);
       setGameState(generateLevel(level + 1, seed));
       return;
     }
 
-    // Capture logic & Trinket collection
+    let nextTrinkets = { ...trinkets };
+
+    if (activeMoveMode) {
+      nextTrinkets[activeMoveMode] -= 1;
+      if (nextTrinkets[activeMoveMode] <= 0) {
+        delete nextTrinkets[activeMoveMode];
+        setActiveMoveMode(null); 
+      }
+    }
+
     if (targetPiece && !targetPiece.isPlayer && !['♟', '♚'].includes(targetPiece.type)) {
-      setTrinkets(prev => prev.length < 3 ? [...prev, targetPiece.type] : prev);
+      nextTrinkets[targetPiece.type] = Math.min((nextTrinkets[targetPiece.type] || 0) + 3, 3);
       setMetrics(m => ({ ...m, captures: m.captures + 1 }));
     }
 
-    // Move player
+    setTrinkets(nextTrinkets);
+
     newBoard[gameState.playerPos.y][gameState.playerPos.x] = null;
-    newBoard[targetPos.y][targetPos.x] = { type: '⭐', isPlayer: true };
+    newBoard[targetPos.y][targetPos.x] = { type: '🛸', isPlayer: true };
     setMetrics(m => ({ ...m, moves: m.moves + 1 }));
     
     setGameState({ board: newBoard, playerPos: targetPos });
-
-    // Trigger AI turn slightly delayed for UX
     setTimeout(() => executeAITurn(newBoard, targetPos), 300);
   };
 
@@ -74,17 +81,33 @@ export default function App() {
   };
 
   const resetGame = () => {
-    exportGameData(metrics);
+    exportGameData(metrics, seed);
+    const newSeed = generateSeed();
     setLevel(1);
-    setTrinkets([]);
+    setSeed(newSeed);
+    setTrinkets({});
+    setActiveMoveMode(null);
     setMetrics({ moves: 0, captures: 0 });
     setGameOver(false);
-    setGameState(generateLevel(1, Math.random().toString(36).substring(7)));
+    setGameState(generateLevel(1, newSeed));
+  };
+
+  const playCustomSeed = () => {
+    if (!seedInput.trim()) return;
+    const newSeed = seedInput.trim();
+    setLevel(1);
+    setSeed(newSeed);
+    setTrinkets({});
+    setActiveMoveMode(null);
+    setMetrics({ moves: 0, captures: 0 });
+    setGameOver(false);
+    setGameState(generateLevel(1, newSeed));
+    setSeedInput('');
   };
 
   return (
     <div className="container">
-      <h1>Level: {level}</h1>
+      <h1> 🛸 UFO Pawn Level: {level} 🛸 </h1>
       <div className="board">
         {gameState.board.map((row, y) => (
           row.map((piece, x) => (
@@ -93,30 +116,65 @@ export default function App() {
               className={`tile ${(x + y) % 2 === 0 ? 'light' : 'dark'}`}
               onClick={() => handleTileClick(x, y)}
             >
-              {piece && (
-                <div 
-                  className={`piece ${piece.isPlayer ? 'player' : 'enemy'}`}
-                  onClick={(e) => {
-                    if (piece.isPlayer) {
-                      e.stopPropagation();
-                      handlePlayerClick();
-                    }
-                  }}
-                >
-                  {piece.type}
-                </div>
-              )}
+              {piece && <div className={`piece ${piece.isPlayer ? 'player' : 'enemy'}`}>{piece.type}</div>}
             </div>
           ))
         ))}
       </div>
       
+      <div className="hud">
+        <div 
+          className={`trinket ${activeMoveMode === null ? 'active' : ''}`}
+          onClick={() => setActiveMoveMode(null)}
+        >
+          <div>♚ Base</div>
+          <div className="dots-grid">
+            <div className="dot infinite">∞</div>
+          </div>
+        </div>
+        {Object.entries(trinkets).map(([type, moves]) => (
+          <div 
+            key={type}
+            className={`trinket ${activeMoveMode === type ? 'active' : ''}`}
+            onClick={() => setActiveMoveMode(type)}
+          >
+            <div>{type}</div>
+            <div className="dots-grid">
+              {Array.from({ length: moves }).map((_, i) => (
+                <div key={i} className="dot" />
+              ))}
+            </div>
+          </div>
+        ))}
+      </div>
+
+      <div className="rules">
+        <h3>How to Play</h3>
+        <ul>
+          <li><strong>Goal:</strong> Capture the enemy King ♚ to advance to the next level.</li>
+          <li><strong>Base Move:</strong> Click the 🛸 and then on a tile. A base move is 1 tile in any direction.</li>
+          <li><strong>Trinkets:</strong> Capture enemies to steal their movement type. Max 3 moves per piece. Select them in the HUD. Capturing the king gives you the trinket move back.</li>
+          <li><strong>Survival:</strong> Don't get captured! The enemy actively hunts you down.</li>
+		  <li><strong>Scoring:</strong> The txt-file will contain the number of moves, pieces captured and a seed.</li>
+		  <li><strong>Seed:</strong> Type the seed into the text box below to try a rerun of exactly those levels.</li>
+        </ul>
+      </div>
+
+      <div className="seed-controls">
+        <input 
+          type="text" 
+          placeholder="Enter seed to retry..." 
+          value={seedInput}
+          onChange={(e) => setSeedInput(e.target.value)}
+        />
+        <button onClick={playCustomSeed}>Go</button>
+      </div>
+
       {gameOver && (
         <div className="modal">
           <h2>Game Over</h2>
-          <p>You reached level {level}</p>
-          <button onClick={resetGame}>Try Again</button>
-          <button onClick={() => window.location.href = 'https://github.com/yourprofile'}>Quit to Portfolio</button>
+          <p>Level erreicht: {level}</p>
+          <button onClick={resetGame}>Generate TXT & Try Again</button>
         </div>
       )}
     </div>
