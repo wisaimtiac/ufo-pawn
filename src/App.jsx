@@ -152,7 +152,7 @@ export default function App() {
         <h3>How to Play</h3>
         <ul>
           <li><strong>Goal:</strong> Capture the enemy King ♚ to advance to the next level.</li>
-          <li><strong>Base Move:</strong> Click the 🛸 and then on a tile. A base move is 1 tile in any direction.</li>
+          <li><strong>Base Move:</strong> Click on a tile to move. A base move is 1 tile in any direction.</li>
           <li><strong>Trinkets:</strong> Capture enemies to steal their movement type. Max 3 moves per piece. Select them in the HUD. Capturing the king gives you the trinket move back.</li>
           <li><strong>Survival:</strong> Don't get captured! The enemy actively hunts you down.</li>
 		  <li><strong>Scoring:</strong> The txt-file will contain the number of moves, pieces captured and a seed.</li>
